@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StudyFlow - Aesthetic Clock & Tracker</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FDFCF8; /* Cream */
+            color: #4A4A4A;
+            transition: background-color 0.5s ease;
+        }
+        
+        h1, h2, .font-serif {
+            font-family: 'Playfair Display', serif;
+        }
+
+        /* --- Animations --- */
+        @keyframes gentle-pulse {
+            0% { box-shadow: 0 0 0 0 var(--pulse-color-start); }
+            70% { box-shadow: 0 0 0 15px var(--pulse-color-end); }
+            100% { box-shadow: 0 0 0 0 var(--pulse-color-end); }
+        }
+
+        @keyframes zen-wave {
+            0% { box-shadow: 0 0 0 0 var(--pulse-color-start), 0 0 0 0 var(--pulse-color-start); }
+            50% { box-shadow: 0 0 0 40px var(--pulse-color-end), 0 0 0 20px var(--pulse-color-mid); }
+            100% { box-shadow: 0 0 0 80px var(--pulse-color-end), 0 0 0 60px var(--pulse-color-end); }
+        }
+
+        .ticking { animation: gentle-pulse 1s infinite; }
+        .zen-ticking { animation: zen-wave 3s infinite ease-out; }
+
+        /* Bird Animations */
+        @keyframes flap {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(-25deg) translateY(-2px); }
+        }
+        .wing-flap { transform-origin: top left; animation: flap 0.15s infinite alternate ease-in-out; }
+        
+        @keyframes breathe {
+            0%, 100% { transform: scaleY(1); }
+            50% { transform: scaleY(0.96) translateY(1px); }
+        }
+        .bird-idle { transform-origin: bottom center; animation: breathe 2s infinite ease-in-out; }
+        
+        @keyframes blink {
+            0%, 48%, 52%, 100% { transform: scaleY(1); }
+            50% { transform: scaleY(0.1); }
+        }
+        .eye-blink { transform-origin: center; animation: blink 4s infinite; }
+        .bird-transition { transition: transform 0.2s linear; }
+
+        /* Delivery Animations */
+        @keyframes fly-pass {
+            0% { left: -100px; transform: scaleX(1); }
+            40% { left: 50%; transform: scaleX(1); }
+            50% { left: 50%; transform: scaleX(1); } /* Pause briefly */
+            100% { left: 120%; transform: scaleX(1); }
+        }
+        
+        @keyframes egg-fall {
+            0% { top: 20%; opacity: 0; transform: scale(0.5); }
+            10% { opacity: 1; transform: scale(1); }
+            100% { top: 50%; opacity: 1; transform: scale(1); }
+        }
+
+        @keyframes egg-wobble {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-10deg); }
+            75% { transform: rotate(10deg); }
+        }
+
+        @keyframes crack-pop {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(1.5); opacity: 0; }
+        }
+
+        .animate-fly-pass { animation: fly-pass 4s linear forwards; }
+        .animate-egg-drop { animation: egg-fall 0.8s cubic-bezier(0.5, 0, 0.8, 1) forwards; }
+        .animate-wobble { animation: egg-wobble 0.3s ease-in-out infinite; }
+        .animate-crack { animation: crack-pop 0.3s ease-out forwards; }
+
+        /* Pop-in animation for modal/toast */
+        @keyframes slide-down {
+            0% { transform: translate(-50%, -100%); opacity: 0; }
+            100% { transform: translate(-50%, 20px); opacity: 1; }
+        }
+        .animate-slide-down {
+            animation: slide-down 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        
+        @keyframes pop-in {
+            0% { transform: scale(0.9); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-pop-in {
+            animation: pop-in 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #E2D5C6; border-radius: 4px; }
+    </style>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        sage: {
+                            100: '#E9F0DE', 200: '#DDE8CC', 300: '#D1E0BC', 400: '#C3D4AA',
+                            500: '#B5C99A', 600: '#A2B888', 700: '#8FA375', 800: '#7C8F63',
+                        },
+                        pink: {
+                            100: '#FFF1F5', 200: '#FEE2EB', 300: '#FDD3E1', 400: '#FCC4D7',
+                            500: '#FAB5CD', 600: '#E69FB7', 700: '#D289A1', 800: '#BE738B',
+                        },
+                        latte: {
+                            100: '#F5EBE0', 200: '#EBE0D6', 300: '#E2D5C6', 500: '#D5BDAF',
+                        },
+                        charcoal: '#4A4A4A',
+                        cream: '#FDFCF8',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="min-h-screen w-full flex items-center justify-center bg-cream py-10 overflow-x-hidden relative transition-colors duration-500">
+    <div id="root" class="w-full h-full flex justify-center"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        // --- Theme Configuration ---
+        const themes = {
+            sage: {
+                name: 'sage',
+                primary: '#B5C99A', 
+                secondary: '#8FA375',
+                bgLight: '#E9F0DE',
+                birdBody: '#B5C99A',
+                birdTummy: '#D1E0BC',
+                classes: {
+                    text: 'text-sage-700',
+                    textLight: 'text-sage-500',
+                    bg: 'bg-sage-500',
+                    bgLight: 'bg-sage-100',
+                    border: 'border-sage-300',
+                    borderStrong: 'border-sage-500',
+                    ring: 'ring-sage-300',
+                    hoverText: 'hover:text-sage-700',
+                    hoverBg: 'hover:bg-sage-100',
+                    calLight: 'bg-sage-200 text-sage-800 hover:bg-sage-300',
+                    calMed: 'bg-sage-400 text-white hover:bg-sage-500',
+                    calHeavy: 'bg-sage-600 text-white hover:bg-sage-700'
+                }
+            },
+            pink: {
+                name: 'pink',
+                primary: '#FAB5CD', 
+                secondary: '#E69FB7',
+                bgLight: '#FFF1F5',
+                birdBody: '#FAB5CD',
+                birdTummy: '#FEE2EB',
+                classes: {
+                    text: 'text-pink-700',
+                    textLight: 'text-pink-500',
+                    bg: 'bg-pink-500',
+                    bgLight: 'bg-pink-100',
+                    border: 'border-pink-300',
+                    borderStrong: 'border-pink-500',
+                    ring: 'ring-pink-300',
+                    hoverText: 'hover:text-pink-700',
+                    hoverBg: 'hover:bg-pink-100',
+                    calLight: 'bg-pink-200 text-pink-800 hover:bg-pink-300',
+                    calMed: 'bg-pink-500 text-white hover:bg-pink-600',
+                    calHeavy: 'bg-pink-700 text-white hover:bg-pink-800'
+                }
+            }
+        };
+
+        // --- Sound Logic ---
+        const playTickSound = () => {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContext) return;
+            const ctx = new AudioContext();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(800, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.05);
+            gain.gain.setValueAtTime(0.05, ctx.currentTime); 
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.1);
+        };
+
+        // --- Aesthetic Bird Component ---
+        const AestheticBird = ({ theme, id }) => {
+            const birdRef = useRef(null);
+            const pos = useRef({ x: Math.random() * window.innerWidth, y: Math.random() * window.innerHeight });
+            const direction = useRef(Math.random() > 0.5 ? 1 : -1);
+            const targetPos = useRef({ x: window.innerWidth / 2, y: 200 });
+            const state = useRef('flying');
+            const timer = useRef(Math.floor(Math.random() * 100)); 
+            const stuckCounter = useRef(0);
+            const [isFlying, setIsFlying] = useState(true);
+
+            const variants = [
+                { name: 'round', transform: 'scale(1)' }, 
+                { name: 'chubby', transform: 'scale(1.15, 0.85)' }, 
+                { name: 'tall', transform: 'scale(0.85, 1.15)' }, 
+                { name: 'tiny', transform: 'scale(0.75)' }, 
+                { name: 'big', transform: 'scale(1.25)' }, 
+            ];
+            const myVariant = variants[id % variants.length];
+
+            useEffect(() => {
+                targetPos.current = { x: Math.random() * window.innerWidth, y: Math.random() * window.innerHeight };
+                
+                let animationFrameId;
+                
+                const updateBird = () => {
+                    timer.current += 1;
+                    const currentPos = pos.current;
+
+                    if (state.current === 'flying') {
+                        const dx = targetPos.current.x - currentPos.x;
+                        const dy = targetPos.current.y - currentPos.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+
+                        if (distance < 20) {
+                            stuckCounter.current = 0;
+                            if (Math.random() > 0.6) {
+                                const card = document.getElementById('main-card');
+                                if (card) {
+                                    const rect = card.getBoundingClientRect();
+                                    const scrollX = window.scrollX || window.pageXOffset;
+                                    const scrollY = window.scrollY || window.pageYOffset;
+                                    targetPos.current = {
+                                        x: rect.left + scrollX + Math.random() * (rect.width - 40) + 20,
+                                        y: rect.top + scrollY - 70 
+                                    };
+                                    state.current = 'landing';
+                                } else {
+                                    targetPos.current = { x: Math.random() * (window.innerWidth - 50) + 25, y: Math.random() * 400 + 50 };
+                                }
+                            } else {
+                                targetPos.current = { x: Math.random() * (window.innerWidth - 50) + 25, y: Math.random() * (window.innerHeight - 100) + 50 };
+                            }
+                        }
+                    } else if (state.current === 'landing') {
+                         const dx = targetPos.current.x - currentPos.x;
+                         const dy = targetPos.current.y - currentPos.y;
+                         const distance = Math.sqrt(dx * dx + dy * dy);
+                         
+                         stuckCounter.current += 1;
+                         if (stuckCounter.current > 300) { 
+                             state.current = 'flying';
+                             stuckCounter.current = 0;
+                         }
+
+                         if (distance < 8) {
+                             state.current = 'perched';
+                             setIsFlying(false);
+                             direction.current = 1;
+                             timer.current = 0;
+                             pos.current.x = targetPos.current.x;
+                             pos.current.y = targetPos.current.y;
+                         }
+                    } else if (state.current === 'perched') {
+                        if (timer.current > 200 + Math.random() * 600) { 
+                            state.current = 'flying';
+                            setIsFlying(true); 
+                            stuckCounter.current = 0;
+                            targetPos.current = { x: Math.random() * (window.innerWidth - 50) + 25, y: Math.random() * 500 };
+                        }
+                    }
+
+                    if (state.current !== 'perched') {
+                        const dx = targetPos.current.x - currentPos.x;
+                        const dy = targetPos.current.y - currentPos.y;
+                        const speed = state.current === 'landing' ? 4 : 2 + (id % 3) * 0.2;
+                        const angle = Math.atan2(dy, dx);
+                        const vx = Math.cos(angle) * speed;
+                        const vy = Math.sin(angle) * speed;
+
+                        if (Math.abs(vx) > 0.1) direction.current = vx > 0 ? 1 : -1;
+
+                        const bob = state.current === 'flying' ? Math.sin((timer.current + id * 20) * 0.1) * 0.5 : 0;
+                        
+                        pos.current.x += vx;
+                        pos.current.y += vy + bob;
+                    }
+
+                    if (birdRef.current) {
+                        birdRef.current.style.left = `${pos.current.x}px`;
+                        birdRef.current.style.top = `${pos.current.y}px`;
+                        birdRef.current.style.transform = `scaleX(${direction.current})`;
+                    }
+
+                    animationFrameId = requestAnimationFrame(updateBird);
+                };
+                
+                animationFrameId = requestAnimationFrame(updateBird);
+                return () => cancelAnimationFrame(animationFrameId);
+            }, [id]); 
+
+            return (
+                <div 
+                    ref={birdRef}
+                    className="absolute z-50 pointer-events-none bird-transition"
+                    style={{ left: pos.current.x, top: pos.current.y }}
+                >
+                    <svg width="40" height="40" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M45 80 L45 90" stroke={theme.secondary} strokeWidth="3" />
+                        <path d="M55 80 L55 90" stroke={theme.secondary} strokeWidth="3" />
+                        <g style={{ transform: myVariant.transform, transformOrigin: '50px 80px' }}>
+                            {isFlying ? (
+                                <g>
+                                    <circle cx="50" cy="50" r="30" fill={theme.birdBody} className="transition-fill duration-500" />
+                                    <path d="M50 80 A30 30 0 0 1 23 60 C 23 60 40 80 80 60 A 30 30 0 0 1 50 80" fill={theme.birdTummy} className="transition-fill duration-500" />
+                                    <circle cx="70" cy="40" r="3" fill="#4A4A4A" />
+                                    <path d="M78 40 L90 45 L78 50 Z" fill="#E2D5C6" />
+                                    <g className="wing-flap" style={{ transformOrigin: '40px 50px' }}>
+                                        <path d="M30 50 C 30 50 10 30 30 30 C 50 30 70 50 30 50" fill="#D5BDAF" />
+                                    </g>
+                                </g>
+                            ) : (
+                                <g className="bird-idle">
+                                    <circle cx="50" cy="50" r="30" fill={theme.birdBody} className="transition-fill duration-500" />
+                                    <ellipse cx="50" cy="65" rx="18" ry="12" fill={theme.birdTummy} className="transition-fill duration-500" />
+                                    <g className="eye-blink">
+                                        <circle cx="40" cy="45" r="3" fill="#4A4A4A" />
+                                        <circle cx="60" cy="45" r="3" fill="#4A4A4A" />
+                                    </g>
+                                    <path d="M46 50 L54 50 L50 56 Z" fill="#E2D5C6" />
+                                    <path d="M22 55 Q 18 65 25 70" stroke="#D5BDAF" strokeWidth="3" fill="none" strokeLinecap="round" />
+                                    <path d="M78 55 Q 82 65 75 70" stroke="#D5BDAF" strokeWidth="3" fill="none" strokeLinecap="round" />
+                                </g>
+                            )}
+                        </g>
+                    </svg>
+                </div>
+            );
+        };
+
+        // --- Delivery Animation Component ---
+        const DeliveryAnimation = ({ theme, onComplete }) => {
+            const [stage, setStage] = useState('fly-in'); 
+            const dropY = (window.innerHeight / 2) - 70; 
+
+            useEffect(() => {
+                const t1 = setTimeout(() => setStage('drop'), 2000); 
+                const t2 = setTimeout(() => setStage('crack'), 2800); 
+                const t3 = setTimeout(() => { if(onComplete) onComplete() }, 3500); 
+
+                return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); }
+            }, []);
+
+            return (
+                <div className="absolute inset-0 z-[60] pointer-events-none overflow-hidden">
+                    <div className={`absolute top-[15%] animate-fly-pass w-20 h-20`} style={{ animationDuration: '4s' }}>
+                        <svg width="80" height="80" viewBox="0 0 100 100" fill="none">
+                            <circle cx="50" cy="50" r="30" fill={theme.birdBody} />
+                            <path d="M50 80 A30 30 0 0 1 23 60 C 23 60 40 80 80 60 A 30 30 0 0 1 50 80" fill={theme.birdTummy} />
+                            <circle cx="70" cy="40" r="3" fill="#4A4A4A" />
+                            <path d="M78 40 L90 45 L78 50 Z" fill="#E2D5C6" />
+                            <g className="wing-flap" style={{ transformOrigin: '40px 50px' }}>
+                                <path d="M30 50 C 30 50 10 30 30 30 C 50 30 70 50 30 50" fill="#D5BDAF" />
+                            </g>
+                        </svg>
+                    </div>
+                    {stage !== 'fly-in' && (
+                        <div className={`absolute left-1/2 transform -translate-x-1/2 ${stage === 'drop' ? 'animate-egg-drop' : ''} ${stage === 'crack' ? 'animate-crack' : ''}`}
+                             style={{ top: stage === 'drop' ? '15%' : `${dropY}px` }}>
+                            {stage === 'crack' ? (
+                                <div className="relative">
+                                    <i className="ph-fill ph-sparkle text-4xl text-yellow-400 absolute -top-4 -left-4 animate-pulse"></i>
+                                    <i className="ph-fill ph-confetti text-3xl text-sage-400 absolute -top-6 right-0 animate-pulse"></i>
+                                </div>
+                            ) : (
+                                <svg width="30" height="40" viewBox="0 0 30 40" className={stage === 'drop' ? '' : 'animate-wobble'}>
+                                    <ellipse cx="15" cy="20" rx="12" ry="16" fill="#FFF" stroke={theme.secondary} strokeWidth="2" />
+                                </svg>
+                            )}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // --- Toast Notification Component ---
+        const Toast = ({ message, theme }) => (
+            <div className={`fixed top-0 left-1/2 transform -translate-x-1/2 z-[100] animate-slide-down`}>
+                <div className={`px-6 py-3 rounded-full shadow-lg ${theme.classes.bg} text-white font-medium flex items-center gap-2`}>
+                    <i className="ph-fill ph-check-circle text-lg"></i>
+                    {message}
+                </div>
+            </div>
+        );
+
+        // --- Weekly Chart Component ---
+        const WeeklyChart = ({ data, theme }) => {
+            const chartRef = useRef(null);
+            const chartInstance = useRef(null);
+
+            useEffect(() => {
+                if (!chartRef.current) return;
+                const ctx = chartRef.current.getContext('2d');
+                if (chartInstance.current) chartInstance.current.destroy();
+
+                const labels = data.map(d => `${d.day} ${d.displayDate}`);
+                const values = data.map(d => parseFloat(d.hours) || 0);
+                
+                const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+                const colorStart = theme.name === 'pink' ? 'rgba(250, 181, 205, 0.8)' : 'rgba(181, 201, 154, 0.8)';
+                gradient.addColorStop(0, colorStart);
+                gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+                chartInstance.current = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Hours Studied',
+                            data: values,
+                            borderColor: theme.secondary,
+                            backgroundColor: gradient,
+                            borderWidth: 3,
+                            pointBackgroundColor: '#FDFCF8',
+                            pointBorderColor: theme.secondary,
+                            pointRadius: 6,
+                            pointHoverRadius: 8,
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                suggestedMax: 4,
+                                grid: { color: theme.bgLight, borderDash: [5, 5] },
+                                ticks: { color: '#D5BDAF', font: { family: 'Inter' } }
+                            },
+                            x: {
+                                grid: { display: false },
+                                ticks: { color: '#D5BDAF', font: { family: 'Inter', size: 10 } }
+                            }
+                        }
+                    }
+                });
+                return () => { if (chartInstance.current) chartInstance.current.destroy(); };
+            }, [data, theme]);
+
+            return (
+                <div className="w-full h-48 sm:h-56 animate-fade-in">
+                    <canvas ref={chartRef}></canvas>
+                </div>
+            );
+        };
+
+        // --- Standard Calendar Component ---
+        const StudyCalendar = ({ historyData, theme, isEditing, onUpdate }) => {
+            const [currentDate, setCurrentDate] = useState(new Date());
+            const [editModal, setEditModal] = useState(null); 
+
+            const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+            const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay(); 
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+            const prevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+            const nextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+
+            const handleDayClick = (dateStr, currentHours) => {
+                if (!isEditing) return;
+                setEditModal({ date: dateStr, hours: currentHours || 0 });
+            };
+
+            const saveModal = (val) => {
+                if (editModal) {
+                    const num = parseFloat(val);
+                    if (!isNaN(num) && num >= 0 && num <= 24) onUpdate(editModal.date, num);
+                    else if (val.trim() === '') onUpdate(editModal.date, 0);
+                    setEditModal(null);
+                }
+            };
+
+            const renderDays = () => {
+                const days = [];
+                for (let i = 0; i < firstDay; i++) {
+                    days.push(<div key={`empty-${i}`} className="h-8 w-8"></div>);
+                }
+                for (let i = 1; i <= daysInMonth; i++) {
+                    const year = currentDate.getFullYear();
+                    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+                    const day = String(i).padStart(2, '0');
+                    const dateStr = `${year}-${month}-${day}`;
+                    const hours = parseFloat(historyData[dateStr]) || 0;
+                    
+                    let colorClass = 'bg-latte-100 text-latte-500'; 
+                    if (hours > 0) colorClass = theme.classes.calLight;
+                    if (hours > 2) colorClass = theme.classes.calMed;
+                    if (hours > 4) colorClass = theme.classes.calHeavy;
+                    
+                    const today = new Date();
+                    const isToday = today.getDate() === i && today.getMonth() === currentDate.getMonth() && today.getFullYear() === currentDate.getFullYear();
+                    
+                    days.push(
+                        <div key={i} onClick={() => handleDayClick(dateStr, hours)}
+                            className={`h-8 w-8 rounded-md flex items-center justify-center text-xs font-medium transition-all relative group ${colorClass} ${isToday ? 'ring-2 ring-charcoal ring-offset-1 ring-offset-white' : ''} ${isEditing ? 'cursor-pointer ring-2 ring-latte-300 hover:scale-110 hover:z-10' : 'cursor-default'}`}>
+                            {i}
+                            {hours > 0 && !isEditing && (
+                                <div className="absolute bottom-full mb-1 bg-charcoal text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 shadow-sm">{hours} hrs</div>
+                            )}
+                        </div>
+                    );
+                }
+                return days;
+            };
+
+            return (
+                <div className="w-full flex flex-col items-center animate-fade-in relative">
+                    <div className="w-full flex justify-between items-center mb-3 px-2">
+                        <button onClick={prevMonth} className={`text-charcoal ${theme.classes.hoverText} p-1 rounded hover:bg-latte-100 transition`}><i className="ph-bold ph-caret-left"></i></button>
+                        <span className="font-serif text-charcoal font-medium text-lg">{monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}</span>
+                        <button onClick={nextMonth} className={`text-charcoal ${theme.classes.hoverText} p-1 rounded hover:bg-latte-100 transition`}><i className="ph-bold ph-caret-right"></i></button>
+                    </div>
+                    <div className="grid grid-cols-7 gap-1.5 w-full text-center mb-2">
+                        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => <span key={d} className="text-[10px] font-bold text-latte-500">{d}</span>)}
+                    </div>
+                    <div className="grid grid-cols-7 gap-1.5 w-full place-items-center">{renderDays()}</div>
+                    {isEditing && <p className="text-[10px] text-sage-600 mt-2 animate-pulse font-medium">Click any day to edit hours</p>}
+                    
+                    {editModal && (
+                        <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/60 backdrop-blur-sm rounded-xl">
+                            <div className="bg-white p-4 rounded-xl shadow-2xl border border-sage-100 flex flex-col items-center w-48 animate-pop-in">
+                                <h4 className="font-serif text-charcoal mb-1">Edit Hours</h4>
+                                <p className="text-[10px] text-latte-500 mb-2">{editModal.date}</p>
+                                <input type="number" defaultValue={editModal.hours} className="w-20 text-center border-b-2 border-sage-300 text-lg font-medium focus:outline-none mb-4 text-charcoal bg-transparent" autoFocus min="0" max="24" step="0.5"
+                                    onKeyDown={(e) => { if(e.key === 'Enter') saveModal(e.currentTarget.value); if(e.key === 'Escape') setEditModal(null); }} id="modal-input" />
+                                <div className="flex gap-2 w-full">
+                                    <button onClick={() => setEditModal(null)} className="flex-1 py-1 text-xs text-latte-500 hover:bg-latte-100 rounded transition">Cancel</button>
+                                    <button onClick={() => saveModal(document.getElementById('modal-input').value)} className="flex-1 py-1 text-xs bg-sage-500 text-white rounded hover:bg-sage-600 shadow-sm transition">Save</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // --- Main App Component ---
+        const App = () => {
+            const [now, setNow] = useState(new Date());
+            const [isStudying, setIsStudying] = useState(false);
+            const [zenMode, setZenMode] = useState(false); 
+            const [soundEnabled, setSoundEnabled] = useState(false);
+            const [currentSessionSeconds, setCurrentSessionSeconds] = useState(0); 
+            const [isEditingData, setIsEditingData] = useState(false);
+            const [viewMode, setViewMode] = useState('chart'); 
+            const [themeName, setThemeName] = useState(() => localStorage.getItem('studyFlowTheme') || 'sage');
+            const [toast, setToast] = useState(null);
+            const [isDelivering, setIsDelivering] = useState(false);
+            const [is24Hour, setIs24Hour] = useState(() => localStorage.getItem('studyFlow24H') === 'true');
+            
+            const theme = themes[themeName];
+
+            useEffect(() => {
+                const root = document.documentElement;
+                if (themeName === 'pink') {
+                    root.style.setProperty('--pulse-color-start', 'rgba(250, 181, 205, 0.4)');
+                    root.style.setProperty('--pulse-color-end', 'rgba(250, 181, 205, 0)');
+                    root.style.setProperty('--pulse-color-mid', 'rgba(250, 181, 205, 0.2)');
+                } else {
+                    root.style.setProperty('--pulse-color-start', 'rgba(181, 201, 154, 0.4)');
+                    root.style.setProperty('--pulse-color-end', 'rgba(181, 201, 154, 0)');
+                    root.style.setProperty('--pulse-color-mid', 'rgba(181, 201, 154, 0.2)');
+                }
+            }, [themeName]);
+
+            // Clear toast
+            useEffect(() => {
+                if (toast) {
+                    const timer = setTimeout(() => setToast(null), 3000);
+                    return () => clearTimeout(timer);
+                }
+            }, [toast]);
+
+            // Easter Egg
+            useEffect(() => {
+                const handleKeyDown = (e) => {
+                    if (zenMode && e.shiftKey && e.key === 'Enter') {
+                        e.preventDefault();
+                        setIsDelivering(true);
+                        setToast("Easter Egg Found! 🥚");
+                    }
+                };
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, [zenMode]);
+
+            const [userName, setUserName] = useState(() => localStorage.getItem('studyFlowName') || 'Alyssa');
+            const [isEditingName, setIsEditingName] = useState(false);
+
+            const handleNameSave = () => {
+                setIsEditingName(false);
+                if (userName.trim() === '') setUserName('Student');
+                localStorage.setItem('studyFlowName', userName);
+            };
+
+            const toggleTheme = () => {
+                const newTheme = themeName === 'sage' ? 'pink' : 'sage';
+                setThemeName(newTheme);
+                localStorage.setItem('studyFlowTheme', newTheme);
+            };
+
+            const toggle24Hour = () => {
+                setIs24Hour(prev => {
+                    const newVal = !prev;
+                    localStorage.setItem('studyFlow24H', newVal);
+                    return newVal;
+                });
+            };
+
+            const toggleFullscreen = () => {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().then(() => {
+                        setToast("Focus Mode Activated ✨");
+                    }).catch(e => {
+                        console.error(`Error attempting to enable full-screen mode: ${e.message}`);
+                    });
+                } else {
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen();
+                        setToast("Exited Focus Mode 🍃");
+                    }
+                }
+            };
+            
+            // --- Data Management ---
+            const generateLast7Days = () => {
+                const data = [];
+                const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                const today = new Date();
+                for (let i = 6; i >= 0; i--) {
+                    const d = new Date(today);
+                    d.setDate(d.getDate() - i);
+                    const year = d.getFullYear();
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    const day = String(d.getDate()).padStart(2, '0');
+                    const dateStr = `${year}-${month}-${day}`;
+                    data.push({ day: days[d.getDay()], displayDate: d.getDate(), fullDate: dateStr, hours: 0 });
+                }
+                return data;
+            };
+            
+            const [studyData, setStudyData] = useState(() => {
+                const saved = localStorage.getItem('studyData');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (parsed.length > 0 && !parsed[0].fullDate) return generateLast7Days();
+                    return parsed;
+                }
+                return generateLast7Days();
+            });
+
+            const [studyHistory, setStudyHistory] = useState(() => {
+                const saved = localStorage.getItem('studyHistory');
+                return saved ? JSON.parse(saved) : {};
+            });
+
+            const handleChartDataChange = (index, newValue) => {
+                const val = parseFloat(newValue) || 0;
+                const newData = [...studyData];
+                newData[index].hours = val;
+                setStudyData(newData);
+                localStorage.setItem('studyData', JSON.stringify(newData));
+                const dateKey = newData[index].fullDate;
+                if (dateKey) {
+                    const newHistory = { ...studyHistory, [dateKey]: val };
+                    setStudyHistory(newHistory);
+                    localStorage.setItem('studyHistory', JSON.stringify(newHistory));
+                }
+            };
+
+            const handleCalendarDataChange = (dateStr, newValue) => {
+                const val = parseFloat(newValue) || 0;
+                const newHistory = { ...studyHistory, [dateStr]: val };
+                setStudyHistory(newHistory);
+                localStorage.setItem('studyHistory', JSON.stringify(newHistory));
+                const weeklyIndex = studyData.findIndex(d => d.fullDate === dateStr);
+                if (weeklyIndex !== -1) {
+                    const newWeekly = [...studyData];
+                    newWeekly[weeklyIndex].hours = val;
+                    setStudyData(newWeekly);
+                    localStorage.setItem('studyData', JSON.stringify(newWeekly));
+                }
+            };
+
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    setNow(new Date());
+                    if (isStudying) {
+                        setCurrentSessionSeconds(prev => prev + 1);
+                        if (soundEnabled) playTickSound();
+                    }
+                }, 1000);
+                return () => clearInterval(interval);
+            }, [isStudying, soundEnabled]);
+
+            const saveSession = () => {
+                const hoursToAdd = currentSessionSeconds / 3600;
+                if (hoursToAdd < 0.016) { 
+                     setIsStudying(false);
+                     setCurrentSessionSeconds(0);
+                     return;
+                }
+                const d = new Date();
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const dayStr = String(d.getDate()).padStart(2, '0');
+                const todayStr = `${year}-${month}-${dayStr}`;
+
+                const currentHistoryHours = parseFloat(studyHistory[todayStr]) || 0;
+                const newTotal = (currentHistoryHours + hoursToAdd).toFixed(1);
+                
+                // Check if we earned a new bird
+                const oldBirds = Math.min(1 + Math.floor(currentHistoryHours), 24);
+                const newBirds = Math.min(1 + Math.floor(parseFloat(newTotal)), 24);
+
+                handleCalendarDataChange(todayStr, newTotal);
+                setIsStudying(false);
+                setCurrentSessionSeconds(0);
+                
+                if (newBirds > oldBirds) {
+                    setIsDelivering(true); // Trigger animation
+                    setToast("New Study Buddy Arrived! 🐦");
+                } else {
+                    setToast(`Session Saved! (+${(hoursToAdd * 60).toFixed(0)}m)`);
+                }
+            };
+
+            const formatTime = (date) => {
+                let hours = date.getHours();
+                const minutes = date.getMinutes();
+                const seconds = date.getSeconds();
+                let ampm = '';
+                
+                if (!is24Hour) {
+                    ampm = hours >= 12 ? 'PM' : 'AM';
+                    hours = hours % 12;
+                    hours = hours ? hours : 12;
+                }
+                
+                const hoursStr = is24Hour 
+                    ? hours.toString().padStart(2, '0') 
+                    : hours.toString();
+
+                return { 
+                    main: `${hoursStr}:${minutes.toString().padStart(2, '0')}`, 
+                    seconds: seconds.toString().padStart(2, '0'),
+                    ampm: ampm
+                };
+            };
+
+            const formatDuration = (totalSeconds) => {
+                const hrs = Math.floor(totalSeconds / 3600);
+                const mins = Math.floor((totalSeconds % 3600) / 60);
+                const secs = totalSeconds % 60;
+                if (hrs > 0) return `${hrs}h ${mins}m ${secs}s`;
+                return `${mins}m ${secs}s`;
+            };
+
+            const toggleTimer = () => {
+                setIsStudying(!isStudying);
+            };
+
+            const timeObj = formatTime(now);
+
+            const todayBirdCount = useMemo(() => {
+                const d = new Date();
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const dayStr = String(d.getDate()).padStart(2, '0');
+                const todayStr = `${year}-${month}-${dayStr}`;
+                const todayData = studyData.find(d => d.fullDate === todayStr);
+                const hours = todayData ? parseFloat(todayData.hours) : 0;
+                return Math.min(1 + Math.floor(hours), 24);
+            }, [studyData]);
+
+            return (
+                <div className="relative w-full h-full flex flex-col items-center justify-center p-4">
+                    {toast && <Toast message={toast} theme={theme} />}
+                    
+                    {!zenMode && Array.from({ length: todayBirdCount }).map((_, i) => (
+                        <AestheticBird key={i} id={i} theme={theme} />
+                    ))}
+
+                    {isDelivering && (
+                        <DeliveryAnimation theme={theme} onComplete={() => setIsDelivering(false)} />
+                    )}
+
+                    <div className="absolute inset-0 z-0 opacity-30 pointer-events-none" 
+                         style={{ backgroundImage: 'radial-gradient(#D1E0BC 1px, transparent 1px)', backgroundSize: '20px 20px' }}>
+                    </div>
+
+                    <div id="main-card" className={`
+                        relative z-10 bg-white/90 backdrop-blur-xl rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] 
+                        transition-all duration-500 ease-in-out border border-white flex flex-col items-center justify-between
+                        ${zenMode ? 'bg-transparent shadow-none border-none w-full h-full max-w-none' : 'w-full max-w-md p-8 min-h-[600px]'}
+                    `}>
+
+                        {!zenMode && (
+                            <div className="w-full flex justify-between items-center mb-2 text-charcoal/60 relative z-20">
+                                <button onClick={() => setZenMode(true)} className={`hover:${theme.classes.text} transition flex items-center gap-2 text-sm font-medium`}>
+                                    <i className="ph ph-arrows-out-simple"></i> Zen Mode
+                                </button>
+                                <div className="flex gap-2">
+                                    <button onClick={toggle24Hour} 
+                                        className={`p-2 px-3 rounded-full transition ${theme.classes.hoverBg} text-charcoal/70 text-xs font-bold`}
+                                        title="Toggle 12H/24H">
+                                        {is24Hour ? '24H' : '12H'}
+                                    </button>
+                                    <button onClick={toggleFullscreen} 
+                                        className={`p-2 rounded-full transition ${theme.classes.hoverBg} text-charcoal/70`}
+                                        title="Toggle Fullscreen">
+                                        <i className="ph-bold ph-arrows-out"></i>
+                                    </button>
+                                    <button onClick={toggleTheme} 
+                                        className={`p-2 rounded-full transition ${theme.classes.hoverBg} text-charcoal/70`}
+                                        title="Switch Theme">
+                                        <i className={`ph-fill ph-paint-brush ${themeName === 'pink' ? 'text-pink-500' : 'text-sage-600'}`}></i>
+                                    </button>
+                                    <button onClick={() => setSoundEnabled(!soundEnabled)} 
+                                        className={`p-2 rounded-full transition ${soundEnabled ? `${theme.classes.textLight} ${theme.classes.bgLight}` : 'hover:bg-latte-100'}`}
+                                        title="Toggle Ticking Sound">
+                                        <i className={`ph ${soundEnabled ? 'ph-speaker-high' : 'ph-speaker-slash'}`}></i>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex flex-col items-center justify-center flex-grow mb-4 w-full">
+                            {!zenMode && (
+                                <div className="mb-6 text-center h-10 flex items-center justify-center">
+                                    {isEditingName ? (
+                                        <input type="text" value={userName} onChange={(e) => setUserName(e.target.value)} onBlur={handleNameSave}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleNameSave()} autoFocus
+                                            className={`font-serif text-3xl text-charcoal text-center bg-transparent border-b ${theme.classes.border} focus:outline-none w-full max-w-[250px] pb-1`} />
+                                    ) : (
+                                        <h2 onClick={() => setIsEditingName(true)} className={`font-serif text-3xl text-charcoal cursor-pointer ${theme.classes.hoverText} transition-colors flex items-center gap-2 group`} title="Click to edit name">
+                                            Hello, {userName}!
+                                            <i className="ph-fill ph-pencil-simple text-sm text-latte-300 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                                        </h2>
+                                    )}
+                                </div>
+                            )}
+
+                            <div className={`
+                                relative flex flex-col items-center justify-center rounded-full border-4 transition-all duration-500
+                                ${isStudying ? (zenMode ? `zen-ticking !border-${themeName}-500` : `${theme.classes.border} ticking`) : 'border-latte-200'}
+                                ${zenMode ? 'w-[80vmin] h-[80vmin] border-[10px]' : 'w-72 h-72 border-4'} bg-cream
+                            `}>
+                                <div className="text-center z-10 flex flex-col items-center">
+                                    <div className="flex items-center justify-center text-charcoal mb-1 ml-4">
+                                        <h1 className={`font-serif ${zenMode ? 'text-[25vmin]' : 'text-6xl sm:text-7xl'} tracking-tighter transition-all duration-300`}>{timeObj.main}</h1>
+                                        <div className="flex flex-col items-start ml-3">
+                                            {!is24Hour && <span className={`font-serif font-bold ${zenMode ? 'text-[4vmin]' : 'text-sm'} ${theme.classes.textLight} opacity-80`}>{timeObj.ampm}</span>}
+                                            <span className={`font-serif ${zenMode ? 'text-[8vmin] leading-none' : 'text-2xl sm:text-3xl'} ${theme.classes.text} opacity-60 w-[45px] text-left transition-all duration-300`}>{timeObj.seconds}</span>
+                                        </div>
+                                    </div>
+                                    <p className={`text-latte-500 uppercase tracking-widest ${zenMode ? 'text-[4vmin] mt-4 mb-8' : 'text-xs mb-5'} font-semibold transition-all duration-300`}>
+                                        {now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                                    </p>
+                                    <div className={`rounded-full font-medium transition-all duration-300 flex items-center ${isStudying ? `${theme.classes.bgLight} ${theme.classes.text} opacity-100` : 'opacity-0 translate-y-2'} ${zenMode ? 'text-[4vmin] px-8 py-3' : 'text-sm px-4 py-1'}`}>
+                                        <i className="ph-fill ph-timer mr-2"></i>
+                                        {formatDuration(currentSessionSeconds)}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {!zenMode && (
+                                <div className="flex items-center gap-4 mt-8">
+                                    {/* Play/Pause Button */}
+                                    <button onClick={toggleTimer} className={`h-14 w-14 rounded-full shadow-lg transition flex items-center justify-center text-2xl ${isStudying ? 'bg-latte-100 text-latte-500 hover:bg-latte-200' : `${theme.classes.bg} text-white hover:scale-105`}`}>
+                                        <i className={`ph-fill ${isStudying ? 'ph-pause' : 'ph-play'}`}></i>
+                                    </button>
+                                    
+                                    {/* Finish Button (Only if session has started) */}
+                                    {currentSessionSeconds > 0 && (
+                                        <button onClick={saveSession} className={`h-14 px-6 rounded-full shadow-lg transition flex items-center justify-center gap-2 text-lg font-medium bg-charcoal text-white hover:bg-gray-800 animate-pop-in`} title="End & Save Session">
+                                            <i className="ph-fill ph-check"></i>
+                                            <span>Finish</span>
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {zenMode && (
+                            <div className="absolute bottom-8 flex gap-6 z-50">
+                                <button onClick={toggleFullscreen} className={`text-charcoal/20 hover:${theme.classes.text} transition`} title="Toggle Fullscreen">
+                                    <i className="ph ph-arrows-out text-4xl"></i>
+                                </button>
+                                <button onClick={() => setZenMode(false)} className={`text-charcoal/20 hover:${theme.classes.text} transition`} title="Exit Zen Mode">
+                                    <i className="ph ph-x-circle text-4xl"></i>
+                                </button>
+                            </div>
+                        )}
+
+                        {!zenMode && (
+                            <div className="w-full mt-4 animate-fade-in">
+                                <div className="bg-white rounded-2xl p-4 shadow-sm border border-latte-100 w-full min-h-[250px] flex flex-col justify-start">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <div className="flex gap-4">
+                                            <button 
+                                                onClick={() => setViewMode('chart')}
+                                                className={`font-serif text-lg transition-colors ${viewMode === 'chart' ? `text-charcoal font-semibold border-b-2 ${theme.classes.borderStrong}` : 'text-latte-500 hover:text-charcoal'}`}
+                                            >
+                                                This Week
+                                            </button>
+                                            <button 
+                                                onClick={() => setViewMode('calendar')}
+                                                className={`font-serif text-lg transition-colors ${viewMode === 'calendar' ? `text-charcoal font-semibold border-b-2 ${theme.classes.borderStrong}` : 'text-latte-500 hover:text-charcoal'}`}
+                                            >
+                                                History
+                                            </button>
+                                        </div>
+                                        
+                                        <button 
+                                            onClick={() => setIsEditingData(!isEditingData)} 
+                                            className={`text-xs font-medium ${theme.classes.text} ${theme.classes.bgLight} hover:opacity-80 px-3 py-1 rounded-full transition-colors`}>
+                                            {isEditingData ? 'Done' : 'Edit Data'}
+                                        </button>
+                                    </div>
+                                    
+                                    <div className="flex-grow flex items-center justify-center w-full">
+                                        {viewMode === 'chart' ? (
+                                            isEditingData ? (
+                                                <div className="grid grid-cols-7 gap-2 h-48 sm:h-56 content-start overflow-y-auto animate-fade-in w-full">
+                                                    {studyData.map((data, index) => (
+                                                        <div key={data.fullDate} className="flex flex-col items-center">
+                                                            <label className="text-[10px] uppercase font-bold text-latte-500 mb-1">{data.day} <span className="font-normal opacity-70">{data.displayDate}</span></label>
+                                                            <input type="number" min="0" step="0.5" value={data.hours} onChange={(e) => handleChartDataChange(index, e.target.value)}
+                                                                className={`w-full text-center bg-latte-100/50 hover:bg-latte-100 focus:bg-white border border-transparent focus:${theme.classes.border} rounded-lg py-2 text-sm text-charcoal font-medium transition-all focus:outline-none focus:shadow-sm`} />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <WeeklyChart data={studyData} theme={theme} />
+                                            )
+                                        ) : (
+                                            <StudyCalendar 
+                                                historyData={studyHistory} 
+                                                theme={theme} 
+                                                isEditing={isEditingData}
+                                                onUpdate={handleCalendarDataChange}
+                                            />
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    {!zenMode && <p className="fixed bottom-4 text-latte-300 text-xs">StudyFlow • {new Date().getFullYear()}</p>}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
