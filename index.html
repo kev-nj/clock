@@ -588,6 +588,7 @@
             const [zenMode, setZenMode] = useState(false); 
             const [soundEnabled, setSoundEnabled] = useState(false);
             const [currentSessionSeconds, setCurrentSessionSeconds] = useState(0); 
+            const [unloggedSeconds, setUnloggedSeconds] = useState(0);
             const [isEditingData, setIsEditingData] = useState(false);
             const [viewMode, setViewMode] = useState('chart'); 
             const [themeName, setThemeName] = useState(() => localStorage.getItem('studyFlowTheme') || 'sage');
@@ -701,6 +702,45 @@
                 return saved ? JSON.parse(saved) : {};
             });
 
+            // Helper to update data & check for new birds
+            const updatePersistentData = (hoursToAdd, isAutoSave = false) => {
+                const d = new Date();
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const dayStr = String(d.getDate()).padStart(2, '0');
+                const todayStr = `${year}-${month}-${dayStr}`;
+
+                // Get current total hours before update
+                const currentHistoryHours = parseFloat(studyHistory[todayStr]) || 0;
+                const newTotal = (currentHistoryHours + hoursToAdd).toFixed(2); // Higher precision for internal math
+
+                // Check bird thresholds (integers)
+                const oldBirds = Math.min(1 + Math.floor(currentHistoryHours), 24);
+                const newBirds = Math.min(1 + Math.floor(parseFloat(newTotal)), 24);
+
+                // Update History State & Storage
+                const newHistory = { ...studyHistory, [todayStr]: newTotal };
+                setStudyHistory(newHistory);
+                localStorage.setItem('studyHistory', JSON.stringify(newHistory));
+
+                // Sync Weekly Chart
+                const weeklyIndex = studyData.findIndex(d => d.fullDate === todayStr);
+                if (weeklyIndex !== -1) {
+                    const newWeekly = [...studyData];
+                    newWeekly[weeklyIndex].hours = newTotal; // Keep precision
+                    setStudyData(newWeekly);
+                    localStorage.setItem('studyData', JSON.stringify(newWeekly));
+                }
+
+                // Bird Check
+                if (newBirds > oldBirds) {
+                    setIsDelivering(true);
+                    setToast("New Study Buddy Arrived! 🐦");
+                }
+                
+                return newTotal;
+            };
+
             const handleChartDataChange = (index, newValue) => {
                 const val = parseFloat(newValue) || 0;
                 const newData = [...studyData];
@@ -729,47 +769,59 @@
                 }
             };
 
+            // Clock Logic with Auto-Save & Drift Correction
             useEffect(() => {
-                const interval = setInterval(() => {
-                    setNow(new Date());
-                    if (isStudying) {
-                        setCurrentSessionSeconds(prev => prev + 1);
-                        if (soundEnabled) playTickSound();
-                    }
-                }, 1000);
-                return () => clearInterval(interval);
-            }, [isStudying, soundEnabled]);
+                let interval = null;
+                // Track the last time the effect ran or interval ticked
+                let lastTick = Date.now();
 
-            const saveSession = () => {
-                const hoursToAdd = currentSessionSeconds / 3600;
-                if (hoursToAdd < 0.016) { 
-                     setIsStudying(false);
-                     setCurrentSessionSeconds(0);
-                     return;
+                if (isStudying) {
+                    interval = setInterval(() => {
+                        const now = Date.now();
+                        const delta = now - lastTick;
+                        
+                        // Only process if at least 1 second has passed (basic throttle check)
+                        if (delta >= 1000) {
+                            const secondsPassed = Math.floor(delta / 1000);
+                            
+                            // Advance lastTick by the exact seconds we are accounting for
+                            // This keeps the remainder (ms) for the next tick
+                            lastTick += secondsPassed * 1000;
+                            
+                            setNow(new Date()); 
+                            setCurrentSessionSeconds(prev => prev + secondsPassed);
+                            
+                            // Auto-save logic
+                            setUnloggedSeconds(prev => {
+                                const newVal = prev + secondsPassed;
+                                if (newVal >= 900) { // 15 minutes
+                                    const hoursToLog = newVal / 3600;
+                                    updatePersistentData(hoursToLog, true); 
+                                    return 0; 
+                                }
+                                return newVal;
+                            });
+
+                            if (soundEnabled) playTickSound();
+                        }
+                    }, 1000);
+                } else {
+                    interval = setInterval(() => setNow(new Date()), 1000);
                 }
-                const d = new Date();
-                const year = d.getFullYear();
-                const month = String(d.getMonth() + 1).padStart(2, '0');
-                const dayStr = String(d.getDate()).padStart(2, '0');
-                const todayStr = `${year}-${month}-${dayStr}`;
+                return () => clearInterval(interval);
+            }, [isStudying, soundEnabled, studyHistory, studyData]); // Dependencies for updatePersistentData context
 
-                const currentHistoryHours = parseFloat(studyHistory[todayStr]) || 0;
-                const newTotal = (currentHistoryHours + hoursToAdd).toFixed(1);
+            const finishSession = () => {
+                const hoursToAdd = unloggedSeconds / 3600;
                 
-                // Check if we earned a new bird
-                const oldBirds = Math.min(1 + Math.floor(currentHistoryHours), 24);
-                const newBirds = Math.min(1 + Math.floor(parseFloat(newTotal)), 24);
+                if (hoursToAdd > 0) {
+                    updatePersistentData(hoursToAdd);
+                    setToast(`Session Saved!`);
+                }
 
-                handleCalendarDataChange(todayStr, newTotal);
                 setIsStudying(false);
                 setCurrentSessionSeconds(0);
-                
-                if (newBirds > oldBirds) {
-                    setIsDelivering(true); // Trigger animation
-                    setToast("New Study Buddy Arrived! 🐦");
-                } else {
-                    setToast(`Session Saved! (+${(hoursToAdd * 60).toFixed(0)}m)`);
-                }
+                setUnloggedSeconds(0);
             };
 
             const formatTime = (date) => {
@@ -920,7 +972,7 @@
                                     
                                     {/* Finish Button (Only if session has started) */}
                                     {currentSessionSeconds > 0 && (
-                                        <button onClick={saveSession} className={`h-14 px-6 rounded-full shadow-lg transition flex items-center justify-center gap-2 text-lg font-medium bg-charcoal text-white hover:bg-gray-800 animate-pop-in`} title="End & Save Session">
+                                        <button onClick={finishSession} className={`h-14 px-6 rounded-full shadow-lg transition flex items-center justify-center gap-2 text-lg font-medium bg-charcoal text-white hover:bg-gray-800 animate-pop-in`} title="End & Save Session">
                                             <i className="ph-fill ph-check"></i>
                                             <span>Finish</span>
                                         </button>
