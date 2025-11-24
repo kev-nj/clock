@@ -154,7 +154,7 @@
     <div id="root" class="w-full h-full flex justify-center"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef, useMemo } = React;
+        const { useState, useEffect, useRef, useMemo, useLayoutEffect } = React;
 
         // --- Theme Configuration ---
         const themes = {
@@ -427,6 +427,160 @@
             </div>
         );
 
+        // --- Session Log Modal (FIXED to be FIXED positioning) ---
+        const SessionLogModal = ({ theme, duration, onSave, onCancel }) => {
+            const [desc, setDesc] = useState("");
+            
+            return (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-white/70 backdrop-blur-sm">
+                    <div className="bg-white p-6 rounded-2xl shadow-2xl border border-latte-200 w-80 animate-pop-in flex flex-col items-center">
+                        <i className={`ph-fill ph-notebook ${theme.classes.text} text-4xl mb-2`}></i>
+                        <h3 className="font-serif text-xl text-charcoal mb-1">Session Complete</h3>
+                        <p className="text-xs text-latte-500 font-medium mb-4 uppercase tracking-widest">{duration} Focus Time</p>
+                        
+                        <div className="w-full mb-4">
+                            <label className="text-xs font-medium text-charcoal block mb-2">What did you focus on?</label>
+                            <input 
+                                type="text" 
+                                placeholder="e.g. Biology Chapter 3..."
+                                value={desc}
+                                onChange={(e) => setDesc(e.target.value)}
+                                autoFocus
+                                onKeyDown={(e) => e.key === 'Enter' && onSave(desc)}
+                                className={`w-full p-3 rounded-xl bg-latte-100 border-transparent focus:border-sage-300 focus:bg-white focus:ring-0 text-sm transition-all outline-none border-2 placeholder-latte-500 text-charcoal`}
+                            />
+                        </div>
+                        
+                        <button 
+                            onClick={() => onSave(desc)}
+                            className={`w-full py-3 rounded-xl ${theme.classes.bg} text-white font-medium shadow-lg hover:scale-105 transition transform mb-2`}
+                        >
+                            Save to Journal
+                        </button>
+                        <button onClick={onCancel} className="text-xs text-latte-500 hover:text-charcoal transition mt-2">
+                            Skip Logging
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- Journal View Modal (FIXED to be FIXED positioning) ---
+        const JournalViewModal = ({ date, entries, theme, onClose, totalHours, onEditEntry }) => {
+            const [editingIndex, setEditingIndex] = useState(-1);
+            const [editValue, setEditValue] = useState("");
+            const listRef = useRef(null);
+
+            // Auto-scroll to top when modal opens
+            useLayoutEffect(() => {
+                if (listRef.current) {
+                    listRef.current.scrollTop = 0;
+                }
+            }, []);
+
+            const startEdit = (index, currentDesc) => {
+                setEditingIndex(index);
+                setEditValue(currentDesc);
+            };
+
+            const saveEdit = (index) => {
+                onEditEntry(date, index, editValue);
+                setEditingIndex(-1);
+            };
+
+            const formatDate = (dateStr) => {
+                const d = new Date(dateStr + 'T00:00:00'); 
+                return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+            };
+            
+            const formatDuration = (seconds) => {
+                const hrs = Math.floor(seconds / 3600);
+                const mins = Math.floor((seconds % 3600) / 60);
+                if (hrs > 0) return `${hrs}h ${mins}m`;
+                return `${mins}m`;
+            };
+
+            const formatTotal = (total) => {
+                const totalSec = total * 3600;
+                const hrs = Math.floor(totalSec / 3600);
+                const mins = Math.floor((totalSec % 3600) / 60);
+                return `${hrs}h ${mins}m`;
+            };
+
+            return (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-white/80 backdrop-blur-md">
+                    <div className="bg-white w-full h-full max-w-md flex flex-col animate-pop-in rounded-3xl overflow-hidden m-4 shadow-2xl border border-white">
+                        {/* Header */}
+                        <div className={`p-6 ${theme.classes.bgLight} flex justify-between items-start shrink-0`}>
+                            <div>
+                                <h3 className={`font-serif text-2xl ${theme.classes.text} mb-1`}>Journal</h3>
+                                <p className="text-sm text-charcoal/60 font-medium">{formatDate(date)}</p>
+                            </div>
+                            <button onClick={onClose} className={`p-2 rounded-full bg-white/50 hover:bg-white ${theme.classes.text} transition`}>
+                                <i className="ph-bold ph-x"></i>
+                            </button>
+                        </div>
+
+                        {/* Stats (Uses Total from Calendar History) */}
+                        <div className="px-6 py-4 border-b border-latte-100 flex justify-between items-center shrink-0">
+                            <span className="text-xs font-bold text-latte-500 uppercase tracking-wider">Daily Total</span>
+                            <span className={`text-lg font-serif ${theme.classes.text}`}>{formatTotal(totalHours)}</span>
+                        </div>
+
+                        {/* List */}
+                        <div ref={listRef} className="flex-1 overflow-y-auto p-6 space-y-4">
+                            {entries.length === 0 ? (
+                                <div className="text-center py-10 text-latte-500">
+                                    <i className="ph-duotone ph-pencil-slash text-4xl mb-2 opacity-50"></i>
+                                    <p className="text-sm">No entries for this day.</p>
+                                </div>
+                            ) : (
+                                entries.map((entry, i) => (
+                                    <div key={i} className="flex gap-4 group/item">
+                                        <div className={`flex flex-col items-center`}>
+                                            <div className={`w-2 h-2 rounded-full ${theme.classes.bg} mt-2`}></div>
+                                            {i !== entries.length - 1 && <div className="w-0.5 h-full bg-latte-200 my-1"></div>}
+                                        </div>
+                                        <div className="pb-4 flex-1">
+                                            {editingIndex === i ? (
+                                                <div className="mb-1">
+                                                    <input 
+                                                        autoFocus
+                                                        value={editValue}
+                                                        onChange={e => setEditValue(e.target.value)}
+                                                        onBlur={() => saveEdit(i)}
+                                                        onKeyDown={e => e.key === 'Enter' && saveEdit(i)}
+                                                        className="w-full text-sm font-medium text-charcoal border-b border-sage-300 outline-none bg-transparent pb-1"
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <div className="flex justify-between items-start">
+                                                    <p 
+                                                        onClick={() => startEdit(i, entry.description)}
+                                                        className="text-sm font-medium text-charcoal cursor-pointer hover:text-sage-600 transition-colors"
+                                                    >
+                                                        {entry.description || "Study Session"}
+                                                    </p>
+                                                    <button 
+                                                        onClick={() => startEdit(i, entry.description)}
+                                                        className="opacity-0 group-hover/item:opacity-100 text-latte-400 hover:text-sage-500 transition-all text-xs"
+                                                        title="Edit Log"
+                                                    >
+                                                        <i className="ph-bold ph-pencil-simple"></i>
+                                                    </button>
+                                                </div>
+                                            )}
+                                            <p className="text-xs text-latte-500 font-mono mt-1">{formatDuration(entry.duration)}</p>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         // --- Weekly Chart Component ---
         const WeeklyChart = ({ data, theme }) => {
             const chartRef = useRef(null);
@@ -492,7 +646,7 @@
         };
 
         // --- Standard Calendar Component ---
-        const StudyCalendar = ({ historyData, theme, isEditing, onUpdate }) => {
+        const StudyCalendar = ({ historyData, theme, isEditing, onUpdate, onDayClick }) => {
             const [currentDate, setCurrentDate] = useState(new Date());
             const [editModal, setEditModal] = useState(null); 
 
@@ -503,9 +657,10 @@
             const prevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
             const nextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
 
-            const handleDayClick = (dateStr, currentHours) => {
-                if (!isEditing) return;
-                setEditModal({ date: dateStr, hours: currentHours || 0 });
+            const handleDayInteraction = (dateStr, currentHours) => {
+                if (isEditing) {
+                    setEditModal({ date: dateStr, hours: currentHours || 0 });
+                }
             };
 
             const saveModal = (val) => {
@@ -538,9 +693,21 @@
                     const isToday = today.getDate() === i && today.getMonth() === currentDate.getMonth() && today.getFullYear() === currentDate.getFullYear();
                     
                     days.push(
-                        <div key={i} onClick={() => handleDayClick(dateStr, hours)}
-                            className={`h-8 w-8 rounded-md flex items-center justify-center text-xs font-medium transition-all relative group ${colorClass} ${isToday ? 'ring-2 ring-charcoal ring-offset-1 ring-offset-white' : ''} ${isEditing ? 'cursor-pointer ring-2 ring-latte-300 hover:scale-110 hover:z-10' : 'cursor-default'}`}>
+                        <div 
+                            key={i} 
+                            onClick={() => handleDayInteraction(dateStr, hours)}
+                            onDoubleClick={() => !isEditing && onDayClick(dateStr)}
+                            className={`
+                                h-8 w-8 rounded-md flex items-center justify-center text-xs font-medium 
+                                transition-all relative group 
+                                ${colorClass} 
+                                ${isToday ? 'ring-2 ring-charcoal ring-offset-1 ring-offset-white' : ''}
+                                ${isEditing ? 'cursor-pointer ring-2 ring-latte-300 hover:scale-110 hover:z-10' : 'cursor-pointer hover:ring-2 hover:ring-latte-200'}
+                            `}
+                            title={isEditing ? "Click to Edit" : "Double-click to view Journal"}
+                        >
                             {i}
+                            {/* Tooltip (Only if not editing) */}
                             {hours > 0 && !isEditing && (
                                 <div className="absolute bottom-full mb-1 bg-charcoal text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 shadow-sm">{hours} hrs</div>
                             )}
@@ -561,7 +728,11 @@
                         {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => <span key={d} className="text-[10px] font-bold text-latte-500">{d}</span>)}
                     </div>
                     <div className="grid grid-cols-7 gap-1.5 w-full place-items-center">{renderDays()}</div>
-                    {isEditing && <p className="text-[10px] text-sage-600 mt-2 animate-pulse font-medium">Click any day to edit hours</p>}
+                    {isEditing ? (
+                        <p className="text-[10px] text-sage-600 mt-2 animate-pulse font-medium">Click any day to edit hours</p>
+                    ) : (
+                        <p className="text-[10px] text-latte-400 mt-2">Double-click a day to view Journal</p>
+                    )}
                     
                     {editModal && (
                         <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/60 backdrop-blur-sm rounded-xl">
@@ -596,6 +767,10 @@
             const [isDelivering, setIsDelivering] = useState(false);
             const [is24Hour, setIs24Hour] = useState(() => localStorage.getItem('studyFlow24H') === 'true');
             
+            // Modal States
+            const [showLogModal, setShowLogModal] = useState(false);
+            const [journalDate, setJournalDate] = useState(null);
+
             const theme = themes[themeName];
 
             useEffect(() => {
@@ -686,33 +861,31 @@
                 }
                 return data;
             };
+            
+            const [studyData, setStudyData] = useState(() => {
+                const saved = localStorage.getItem('studyData');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (parsed.length > 0 && !parsed[0].fullDate) return generateLast7Days();
+                    return parsed;
+                }
+                return generateLast7Days();
+            });
 
             const [studyHistory, setStudyHistory] = useState(() => {
                 const saved = localStorage.getItem('studyHistory');
                 return saved ? JSON.parse(saved) : {};
             });
-            
-            // CORRECTLY INITIALIZE STUDY DATA (Fixes stale data bug)
-            const [studyData, setStudyData] = useState(() => {
-                const currentWeek = generateLast7Days();
-                const savedHistory = localStorage.getItem('studyHistory');
-                const history = savedHistory ? JSON.parse(savedHistory) : {};
 
-                // Hydrate the new 7-day window with historic data if it exists
-                const hydratedData = currentWeek.map(day => ({
-                    ...day,
-                    hours: history[day.fullDate] || 0
-                }));
-                
-                return hydratedData;
+            const [studyJournal, setStudyJournal] = useState(() => {
+                const saved = localStorage.getItem('studyJournal');
+                return saved ? JSON.parse(saved) : {};
             });
 
             // Ensure chart refreshes INSTANTLY when day changes
             useEffect(() => {
                 if (studyData.length === 0) return;
-                
                 const lastEntryDate = studyData[studyData.length - 1].fullDate;
-                
                 const d = new Date();
                 const year = d.getFullYear();
                 const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -728,8 +901,7 @@
                     setStudyData(hydratedData);
                     localStorage.setItem('studyData', JSON.stringify(hydratedData));
                 }
-            }, [now, studyData, studyHistory]); // Runs every second when 'now' updates
-
+            }, [now, studyData, studyHistory]);
 
             // Helper to update data & check for new birds
             const updatePersistentData = (hoursToAdd, isAutoSave = false) => {
@@ -739,29 +911,24 @@
                 const dayStr = String(d.getDate()).padStart(2, '0');
                 const todayStr = `${year}-${month}-${dayStr}`;
 
-                // Get current total hours before update
                 const currentHistoryHours = parseFloat(studyHistory[todayStr]) || 0;
-                const newTotal = (currentHistoryHours + hoursToAdd).toFixed(2); // Higher precision for internal math
+                const newTotal = (currentHistoryHours + hoursToAdd).toFixed(2); 
 
-                // Check bird thresholds (integers)
                 const oldBirds = Math.min(1 + Math.floor(currentHistoryHours), 24);
                 const newBirds = Math.min(1 + Math.floor(parseFloat(newTotal)), 24);
 
-                // Update History State & Storage
                 const newHistory = { ...studyHistory, [todayStr]: newTotal };
                 setStudyHistory(newHistory);
                 localStorage.setItem('studyHistory', JSON.stringify(newHistory));
 
-                // Sync Weekly Chart
                 const weeklyIndex = studyData.findIndex(d => d.fullDate === todayStr);
                 if (weeklyIndex !== -1) {
                     const newWeekly = [...studyData];
-                    newWeekly[weeklyIndex].hours = newTotal; // Keep precision
+                    newWeekly[weeklyIndex].hours = newTotal; 
                     setStudyData(newWeekly);
                     localStorage.setItem('studyData', JSON.stringify(newWeekly));
                 }
 
-                // Bird Check
                 if (newBirds > oldBirds) {
                     setIsDelivering(true);
                     setToast("New Study Buddy Arrived! 🐦");
@@ -775,7 +942,7 @@
                 const newData = [...studyData];
                 newData[index].hours = val;
                 setStudyData(newData);
-                // Sync to History
+                localStorage.setItem('studyData', JSON.stringify(newData));
                 const dateKey = newData[index].fullDate;
                 if (dateKey) {
                     const newHistory = { ...studyHistory, [dateKey]: val };
@@ -789,39 +956,38 @@
                 const newHistory = { ...studyHistory, [dateStr]: val };
                 setStudyHistory(newHistory);
                 localStorage.setItem('studyHistory', JSON.stringify(newHistory));
-                
-                // Sync Chart if visible
                 const weeklyIndex = studyData.findIndex(d => d.fullDate === dateStr);
                 if (weeklyIndex !== -1) {
                     const newWeekly = [...studyData];
                     newWeekly[weeklyIndex].hours = val;
                     setStudyData(newWeekly);
+                    localStorage.setItem('studyData', JSON.stringify(newWeekly));
                 }
             };
 
-            // Clock Logic with Auto-Save & Drift Correction
+            const handleEditJournalEntry = (dateStr, index, newDescription) => {
+                const currentEntries = studyJournal[dateStr] || [];
+                const updatedEntries = [...currentEntries];
+                updatedEntries[index] = { ...updatedEntries[index], description: newDescription };
+                
+                const newJournal = { ...studyJournal, [dateStr]: updatedEntries };
+                setStudyJournal(newJournal);
+                localStorage.setItem('studyJournal', JSON.stringify(newJournal));
+            };
+
             useEffect(() => {
                 let interval = null;
-                // Track the last time the effect ran or interval ticked
                 let lastTick = Date.now();
 
                 if (isStudying) {
                     interval = setInterval(() => {
                         const now = Date.now();
                         const delta = now - lastTick;
-                        
-                        // Only process if at least 1 second has passed (basic throttle check)
                         if (delta >= 1000) {
                             const secondsPassed = Math.floor(delta / 1000);
-                            
-                            // Advance lastTick by the exact seconds we are accounting for
-                            // This keeps the remainder (ms) for the next tick
                             lastTick += secondsPassed * 1000;
-                            
                             setNow(new Date()); 
                             setCurrentSessionSeconds(prev => prev + secondsPassed);
-                            
-                            // Auto-save logic
                             setUnloggedSeconds(prev => {
                                 const newVal = prev + secondsPassed;
                                 if (newVal >= 900) { // 15 minutes
@@ -831,7 +997,6 @@
                                 }
                                 return newVal;
                             });
-
                             if (soundEnabled) playTickSound();
                         }
                     }, 1000);
@@ -839,19 +1004,47 @@
                     interval = setInterval(() => setNow(new Date()), 1000);
                 }
                 return () => clearInterval(interval);
-            }, [isStudying, soundEnabled, studyHistory, studyData]); // Dependencies for updatePersistentData context
+            }, [isStudying, soundEnabled, studyHistory, studyData]); 
 
-            const finishSession = () => {
+            // Triggered by the Finish Button
+            const initiateFinishSession = () => {
+                setShowLogModal(true);
+            };
+
+            // Finalize saving after log
+            const completeFinishSession = (description) => {
                 const hoursToAdd = unloggedSeconds / 3600;
-                
                 if (hoursToAdd > 0) {
                     updatePersistentData(hoursToAdd);
-                    setToast(`Session Saved!`);
                 }
 
+                const d = new Date();
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const dayStr = String(d.getDate()).padStart(2, '0');
+                const todayStr = `${year}-${month}-${dayStr}`;
+
+                const newEntry = {
+                    description: description || "Study Session",
+                    duration: currentSessionSeconds, // Total duration of this sitting
+                    timestamp: Date.now()
+                };
+
+                const currentEntries = studyJournal[todayStr] || [];
+                const newJournal = { ...studyJournal, [todayStr]: [...currentEntries, newEntry] };
+                
+                setStudyJournal(newJournal);
+                localStorage.setItem('studyJournal', JSON.stringify(newJournal));
+
+                setShowLogModal(false);
                 setIsStudying(false);
                 setCurrentSessionSeconds(0);
                 setUnloggedSeconds(0);
+                setToast("Session Logged & Saved! 📔");
+            };
+
+            const cancelFinish = () => {
+                setShowLogModal(false);
             };
 
             const formatTime = (date) => {
@@ -859,22 +1052,13 @@
                 const minutes = date.getMinutes();
                 const seconds = date.getSeconds();
                 let ampm = '';
-                
                 if (!is24Hour) {
                     ampm = hours >= 12 ? 'PM' : 'AM';
                     hours = hours % 12;
                     hours = hours ? hours : 12;
                 }
-                
-                const hoursStr = is24Hour 
-                    ? hours.toString().padStart(2, '0') 
-                    : hours.toString();
-
-                return { 
-                    main: `${hoursStr}:${minutes.toString().padStart(2, '0')}`, 
-                    seconds: seconds.toString().padStart(2, '0'),
-                    ampm: ampm
-                };
+                const hoursStr = is24Hour ? hours.toString().padStart(2, '0') : hours.toString();
+                return { main: `${hoursStr}:${minutes.toString().padStart(2, '0')}`, seconds: seconds.toString().padStart(2, '0'), ampm: ampm };
             };
 
             const formatDuration = (totalSeconds) => {
@@ -897,17 +1081,34 @@
                 const month = String(d.getMonth() + 1).padStart(2, '0');
                 const dayStr = String(d.getDate()).padStart(2, '0');
                 const todayStr = `${year}-${month}-${dayStr}`;
-                
-                // Check history directly for bird count, don't rely on studyData (chart) state
-                // This ensures bird count is correct even if chart hasn't re-rendered yet
                 const hours = parseFloat(studyHistory[todayStr]) || 0;
-                
                 return Math.min(1 + Math.floor(hours), 24);
-            }, [studyHistory, now]); // Recalc if history changes or day changes
+            }, [studyHistory, now]);
 
             return (
                 <div className="relative w-full h-full flex flex-col items-center justify-center p-4">
                     {toast && <Toast message={toast} theme={theme} />}
+                    
+                    {/* MODALS */}
+                    {showLogModal && (
+                        <SessionLogModal 
+                            theme={theme} 
+                            duration={formatDuration(currentSessionSeconds)}
+                            onSave={completeFinishSession}
+                            onCancel={cancelFinish}
+                        />
+                    )}
+
+                    {journalDate && (
+                        <JournalViewModal 
+                            date={journalDate}
+                            entries={studyJournal[journalDate] || []}
+                            totalHours={parseFloat(studyHistory[journalDate]) || 0}
+                            theme={theme}
+                            onClose={() => setJournalDate(null)}
+                            onEditEntry={handleEditJournalEntry}
+                        />
+                    )}
                     
                     {!zenMode && Array.from({ length: todayBirdCount }).map((_, i) => (
                         <AestheticBird key={i} id={i} theme={theme} />
@@ -1003,9 +1204,9 @@
                                         <i className={`ph-fill ${isStudying ? 'ph-pause' : 'ph-play'}`}></i>
                                     </button>
                                     
-                                    {/* Finish Button (Only if session has started) */}
+                                    {/* Finish Button */}
                                     {currentSessionSeconds > 0 && (
-                                        <button onClick={finishSession} className={`h-14 px-6 rounded-full shadow-lg transition flex items-center justify-center gap-2 text-lg font-medium bg-charcoal text-white hover:bg-gray-800 animate-pop-in`} title="End & Save Session">
+                                        <button onClick={initiateFinishSession} className={`h-14 px-6 rounded-full shadow-lg transition flex items-center justify-center gap-2 text-lg font-medium bg-charcoal text-white hover:bg-gray-800 animate-pop-in`} title="End & Save Session">
                                             <i className="ph-fill ph-check"></i>
                                             <span>Finish</span>
                                         </button>
@@ -1072,6 +1273,7 @@
                                                 theme={theme} 
                                                 isEditing={isEditingData}
                                                 onUpdate={handleCalendarDataChange}
+                                                onDayClick={(date) => setJournalDate(date)}
                                             />
                                         )}
                                     </div>
