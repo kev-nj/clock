@@ -222,7 +222,7 @@
             osc.stop(ctx.currentTime + 0.1);
         };
 
-        // --- Aesthetic Bird Component ---
+        // --- Aesthetic Bird Component (Optimized for Flock) ---
         const AestheticBird = ({ theme, id }) => {
             const birdRef = useRef(null);
             const pos = useRef({ x: Math.random() * window.innerWidth, y: Math.random() * window.innerHeight });
@@ -686,21 +686,50 @@
                 }
                 return data;
             };
-            
-            const [studyData, setStudyData] = useState(() => {
-                const saved = localStorage.getItem('studyData');
-                if (saved) {
-                    const parsed = JSON.parse(saved);
-                    if (parsed.length > 0 && !parsed[0].fullDate) return generateLast7Days();
-                    return parsed;
-                }
-                return generateLast7Days();
-            });
 
             const [studyHistory, setStudyHistory] = useState(() => {
                 const saved = localStorage.getItem('studyHistory');
                 return saved ? JSON.parse(saved) : {};
             });
+            
+            // CORRECTLY INITIALIZE STUDY DATA (Fixes stale data bug)
+            const [studyData, setStudyData] = useState(() => {
+                const currentWeek = generateLast7Days();
+                const savedHistory = localStorage.getItem('studyHistory');
+                const history = savedHistory ? JSON.parse(savedHistory) : {};
+
+                // Hydrate the new 7-day window with historic data if it exists
+                const hydratedData = currentWeek.map(day => ({
+                    ...day,
+                    hours: history[day.fullDate] || 0
+                }));
+                
+                return hydratedData;
+            });
+
+            // Ensure chart refreshes INSTANTLY when day changes
+            useEffect(() => {
+                if (studyData.length === 0) return;
+                
+                const lastEntryDate = studyData[studyData.length - 1].fullDate;
+                
+                const d = new Date();
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const dayStr = String(d.getDate()).padStart(2, '0');
+                const todayStr = `${year}-${month}-${dayStr}`;
+                
+                if (lastEntryDate !== todayStr) {
+                    const currentWeek = generateLast7Days();
+                    const hydratedData = currentWeek.map(day => ({
+                        ...day,
+                        hours: studyHistory[day.fullDate] || 0
+                    }));
+                    setStudyData(hydratedData);
+                    localStorage.setItem('studyData', JSON.stringify(hydratedData));
+                }
+            }, [now, studyData, studyHistory]); // Runs every second when 'now' updates
+
 
             // Helper to update data & check for new birds
             const updatePersistentData = (hoursToAdd, isAutoSave = false) => {
@@ -746,7 +775,7 @@
                 const newData = [...studyData];
                 newData[index].hours = val;
                 setStudyData(newData);
-                localStorage.setItem('studyData', JSON.stringify(newData));
+                // Sync to History
                 const dateKey = newData[index].fullDate;
                 if (dateKey) {
                     const newHistory = { ...studyHistory, [dateKey]: val };
@@ -760,12 +789,13 @@
                 const newHistory = { ...studyHistory, [dateStr]: val };
                 setStudyHistory(newHistory);
                 localStorage.setItem('studyHistory', JSON.stringify(newHistory));
+                
+                // Sync Chart if visible
                 const weeklyIndex = studyData.findIndex(d => d.fullDate === dateStr);
                 if (weeklyIndex !== -1) {
                     const newWeekly = [...studyData];
                     newWeekly[weeklyIndex].hours = val;
                     setStudyData(newWeekly);
-                    localStorage.setItem('studyData', JSON.stringify(newWeekly));
                 }
             };
 
@@ -867,10 +897,13 @@
                 const month = String(d.getMonth() + 1).padStart(2, '0');
                 const dayStr = String(d.getDate()).padStart(2, '0');
                 const todayStr = `${year}-${month}-${dayStr}`;
-                const todayData = studyData.find(d => d.fullDate === todayStr);
-                const hours = todayData ? parseFloat(todayData.hours) : 0;
+                
+                // Check history directly for bird count, don't rely on studyData (chart) state
+                // This ensures bird count is correct even if chart hasn't re-rendered yet
+                const hours = parseFloat(studyHistory[todayStr]) || 0;
+                
                 return Math.min(1 + Math.floor(hours), 24);
-            }, [studyData]);
+            }, [studyHistory, now]); // Recalc if history changes or day changes
 
             return (
                 <div className="relative w-full h-full flex flex-col items-center justify-center p-4">
