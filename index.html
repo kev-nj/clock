@@ -790,6 +790,11 @@
             const [showLogModal, setShowLogModal] = useState(false);
             const [journalDate, setJournalDate] = useState(null);
 
+            // Time Tracking Refs (Absolute Time)
+            const startTimeRef = useRef(null);
+            const accumulatedTimeRef = useRef(0);
+            const lastLogTimeRef = useRef(0);
+
             const theme = themes[themeName];
 
             useEffect(() => {
@@ -1004,28 +1009,40 @@
 
             useEffect(() => {
                 let interval = null;
-                let lastTick = Date.now();
 
                 if (isStudying) {
                     interval = setInterval(() => {
                         const now = Date.now();
-                        const delta = now - lastTick;
-                        if (delta >= 1000) {
-                            const secondsPassed = Math.floor(delta / 1000);
-                            lastTick += secondsPassed * 1000;
-                            setNow(new Date()); 
-                            setCurrentSessionSeconds(prev => prev + secondsPassed);
-                            setUnloggedSeconds(prev => {
-                                const newVal = prev + secondsPassed;
-                                if (newVal >= 900) { // 15 minutes
-                                    const hoursToLog = newVal / 3600;
-                                    updatePersistentData(hoursToLog, true); 
-                                    return 0; 
-                                }
-                                return newVal;
-                            });
-                            if (soundEnabled) playTickSound();
+                        setNow(new Date(now)); 
+
+                        if (startTimeRef.current) {
+                            // Absolute time calculation to handle system clock changes
+                            const sessionDuration = (now - startTimeRef.current) / 1000;
+                            const totalElapsed = Math.floor(accumulatedTimeRef.current + sessionDuration);
+                            
+                            // Prevent negative time if clock moves backward significantly
+                            const safeTotal = Math.max(0, totalElapsed);
+                            
+                            setCurrentSessionSeconds(safeTotal);
+
+                            // Calculate unlogged time based on absolute totals
+                            const newUnlogged = safeTotal - lastLogTimeRef.current;
+                            
+                            if (newUnlogged >= 900) { // 15 minutes
+                                const chunks = Math.floor(newUnlogged / 900);
+                                const secondsToLog = chunks * 900;
+                                const hoursToLog = secondsToLog / 3600;
+                                
+                                updatePersistentData(hoursToLog, true);
+                                
+                                lastLogTimeRef.current += secondsToLog;
+                                setUnloggedSeconds(newUnlogged % 900);
+                            } else {
+                                setUnloggedSeconds(newUnlogged);
+                            }
                         }
+                        
+                        if (soundEnabled) playTickSound();
                     }, 1000);
                 } else {
                     interval = setInterval(() => setNow(new Date()), 1000);
@@ -1040,9 +1057,10 @@
 
             // Finalize saving after log
             const completeFinishSession = (description) => {
-                const hoursToAdd = unloggedSeconds / 3600;
-                if (hoursToAdd > 0) {
-                    updatePersistentData(hoursToAdd);
+                // Calculate remaining unlogged time accurately using refs
+                const finalUnlogged = currentSessionSeconds - lastLogTimeRef.current;
+                if (finalUnlogged > 0) {
+                    updatePersistentData(finalUnlogged / 3600);
                 }
 
                 const d = new Date();
@@ -1067,20 +1085,31 @@
                 setIsStudying(false);
                 setCurrentSessionSeconds(0);
                 setUnloggedSeconds(0);
+                
+                // Reset Tracking Refs
+                accumulatedTimeRef.current = 0;
+                startTimeRef.current = null;
+                lastLogTimeRef.current = 0;
+
                 setToast("Session Logged & Saved! 📔");
             };
 
             const cancelFinish = () => {
-                // Save unlogged time to totals even if skipping journal
-                const hoursToAdd = unloggedSeconds / 3600;
-                if (hoursToAdd > 0) {
-                    updatePersistentData(hoursToAdd);
+                const finalUnlogged = currentSessionSeconds - lastLogTimeRef.current;
+                if (finalUnlogged > 0) {
+                    updatePersistentData(finalUnlogged / 3600);
                 }
 
                 setShowLogModal(false);
                 setIsStudying(false);
                 setCurrentSessionSeconds(0);
                 setUnloggedSeconds(0);
+                
+                // Reset Tracking Refs
+                accumulatedTimeRef.current = 0;
+                startTimeRef.current = null;
+                lastLogTimeRef.current = 0;
+
                 setToast("Session Saved!");
             };
 
@@ -1107,7 +1136,20 @@
             };
 
             const toggleTimer = () => {
-                setIsStudying(!isStudying);
+                if (isStudying) {
+                    // Pause Logic
+                    const now = Date.now();
+                    if (startTimeRef.current) {
+                        const sessionDuration = (now - startTimeRef.current) / 1000;
+                        accumulatedTimeRef.current += sessionDuration;
+                    }
+                    startTimeRef.current = null;
+                    setIsStudying(false);
+                } else {
+                    // Start Logic
+                    startTimeRef.current = Date.now();
+                    setIsStudying(true);
+                }
             };
 
             const timeObj = formatTime(now);
