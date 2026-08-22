@@ -447,6 +447,37 @@
         );
 
         // --- Session Log Modal ---
+
+        const WelcomeModal = ({ theme, onSubmit }) => {
+            const [value, setValue] = useState('');
+            return (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-white/80 backdrop-blur-md p-4">
+                    <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl border border-white p-8 animate-pop-in text-center">
+                        <i className={`ph-duotone ph-hand-waving text-5xl mb-3 ${theme.classes.text}`}></i>
+                        <h3 className="font-serif text-3xl text-charcoal mb-2">Welcome!</h3>
+                        <p className="text-sm text-charcoal/60 mb-6">What should we call you?</p>
+                        <form onSubmit={(e) => { e.preventDefault(); onSubmit(value); }}>
+                            <input
+                                type="text"
+                                autoFocus
+                                value={value}
+                                onChange={(e) => setValue(e.target.value)}
+                                placeholder="Your name"
+                                maxLength={30}
+                                className={`w-full font-serif text-2xl text-charcoal text-center bg-transparent border-b ${theme.classes.border} focus:outline-none pb-2 mb-6`}
+                            />
+                            <button
+                                type="submit"
+                                disabled={value.trim() === ''}
+                                className={`w-full py-3 rounded-full font-semibold text-white transition ${theme.classes.bg} disabled:opacity-40 disabled:cursor-not-allowed`}>
+                                Get Started
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+
         const SessionLogModal = ({ theme, duration, onSave, onCancel }) => {
             const [desc, setDesc] = useState("");
             
@@ -831,13 +862,27 @@
                 return () => window.removeEventListener('keydown', handleKeyDown);
             }, [zenMode]);
 
-            const [userName, setUserName] = useState(() => localStorage.getItem('studyFlowName') || 'Alyssa');
+            const [userName, setUserName] = useState(() => localStorage.getItem('studyFlowName') || '');
             const [isEditingName, setIsEditingName] = useState(false);
+            const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem('studyFlowName'));
 
             const handleNameSave = () => {
                 setIsEditingName(false);
-                if (userName.trim() === '') setUserName('Student');
-                localStorage.setItem('studyFlowName', userName);
+                const trimmed = userName.trim();
+                if (trimmed === '') {
+                    setUserName(localStorage.getItem('studyFlowName') || '');
+                    return;
+                }
+                setUserName(trimmed);
+                localStorage.setItem('studyFlowName', trimmed);
+            };
+
+            const handleWelcomeSubmit = (name) => {
+                const trimmed = name.trim();
+                if (trimmed === '') return;
+                setUserName(trimmed);
+                localStorage.setItem('studyFlowName', trimmed);
+                setShowWelcome(false);
             };
 
             const toggleTheme = () => {
@@ -1169,6 +1214,10 @@
                     {toast && <Toast message={toast} theme={theme} />}
                     
                     {/* MODALS */}
+                    {showWelcome && (
+                        <WelcomeModal theme={theme} onSubmit={handleWelcomeSubmit} />
+                    )}
+
                     {showLogModal && (
                         <SessionLogModal 
                             theme={theme} 
@@ -1251,7 +1300,7 @@
                                             className={`font-serif text-3xl text-charcoal text-center bg-transparent border-b ${theme.classes.border} focus:outline-none w-full max-w-[250px] pb-1`} />
                                     ) : (
                                         <h2 onClick={() => setIsEditingName(true)} className={`font-serif text-3xl text-charcoal cursor-pointer ${theme.classes.hoverText} transition-colors flex items-center gap-2 group`} title="Click to edit name">
-                                            Hello, {userName}!
+                                            Hello, {userName || 'there'}!
                                             <i className="ph-fill ph-pencil-simple text-sm text-latte-300 opacity-0 group-hover:opacity-100 transition-opacity"></i>
                                         </h2>
                                     )}
